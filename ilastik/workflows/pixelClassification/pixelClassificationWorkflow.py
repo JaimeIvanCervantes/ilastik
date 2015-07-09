@@ -77,7 +77,8 @@ class PixelClassificationWorkflow(Workflow):
         parser.add_argument('--random-label-value', help="The label value to use injecting random labels", default=1, type=int)
         parser.add_argument('--random-label-count', help="The number of random labels to inject via --generate-random-labels", default=2000, type=int)
         parser.add_argument('--retrain', help="Re-train the classifier based on labels stored in project file, and re-save.", action="store_true")
-        parser.add_argument('--export-labels', help="Export all label volumes to disk.", action="store_true")
+        #parser.add_argument('--export-labels', help="Export all label volumes to disk.", action="store_true")
+        parser.add_argument('--export-labels', help="Export label volumes to HDF5 files.")
 
         # Parse the creation args: These were saved to the project file when this project was first created.
         parsed_creation_args, unused_args = parser.parse_known_args(project_creation_args)
@@ -418,15 +419,18 @@ class PixelClassificationWorkflow(Workflow):
             # store new classifier to project file
             projectManager.saveProject(force_all_save=False)
 
-        if self.export_labels:
+        if self.export_labels:       
             opPixelClassification = self.pcApplet.topLevelOperator
+
             for lane_index, label_slot in enumerate(opPixelClassification.LabelImages):
+                print "lane: ", lane_index
+                
                 label_volume = label_slot[:].wait()
-                output_file = 'exported-labels-{}.h5'.format( lane_index )
+                output_file = self.export_labels + '_labels_{}.h5'.format( lane_index )
                 logger.info("Exporting labels to " + output_file)
                 with h5py.File(output_file, 'w') as f:
-                    f.create_dataset('labels', data=label_volume, chunks=True, compression='gzip', compression_opts=2)
-                    f['labels'].attrs['axistags'] = label_slot.meta.axistags.toJSON()
+                    f.create_dataset('data', data=label_volume, chunks=True, compression='gzip', compression_opts=2)
+                    f['data'].attrs['axistags'] = label_slot.meta.axistags.toJSON()
 
         if self._headless and self._batch_input_args and self._batch_export_args:
             # Make sure we're using the up-to-date classifier.
