@@ -12,6 +12,7 @@ from ilastik.applets.trackingFeatureExtraction.trackingFeatureExtractionApplet i
 from ilastik.applets.trackingFeatureExtraction import config
 from lazyflow.operators.opReorderAxes import OpReorderAxes
 from ilastik.applets.tracking.base.trackingBaseDataExportApplet import TrackingBaseDataExportApplet
+from ilastik.applets.batchProcessing import BatchProcessingApplet
 
 class ConservationTrackingWorkflowBase( Workflow ):
     workflowName = "Automatic Tracking Workflow (Conservation Tracking) BASE"
@@ -37,7 +38,7 @@ class ConservationTrackingWorkflowBase( Workflow ):
                                                        "Input Data", 
                                                        forceAxisOrder='txyzc',
                                                        instructionText=data_instructions,
-                                                       max_lanes=1
+                                                       max_lanes=None
                                                        )
         
         opDataSelection = self.dataSelectionApplet.topLevelOperator
@@ -74,10 +75,16 @@ class ConservationTrackingWorkflowBase( Workflow ):
         opDataExport = self.dataExportApplet.topLevelOperator
         opDataExport.SelectionNames.setValue( ['Object Identities', 'Tracking Result', 'Merger Result'] )
         opDataExport.WorkingDirectory.connect( opDataSelection.WorkingDirectory )
+
+        self.batchProcessingApplet = BatchProcessingApplet(self, 
+                                                           "Batch Processing", 
+                                                           self.dataSelectionApplet, 
+                                                           self.dataExportApplet)
         
         # Extra configuration for object export table (as CSV table or HDF5 table)
         opTracking = self.trackingApplet.topLevelOperator
         self.dataExportApplet.set_exporting_operator(opTracking)
+        self.dataExportApplet.prepare_lane_for_export = self.prepare_lane_for_export
         self.dataExportApplet.post_process_lane_export = self.post_process_lane_export
         
         self._applets = []                
@@ -91,6 +98,7 @@ class ConservationTrackingWorkflowBase( Workflow ):
         self._applets.append(self.cellClassificationApplet)
         self._applets.append(self.trackingApplet)
         self._applets.append(self.dataExportApplet)
+        self._applets.append(self.batchProcessingApplet)
         
     @property
     def applets(self):
@@ -203,6 +211,16 @@ class ConservationTrackingWorkflowBase( Workflow ):
         opDataExport.RawData.connect( op5Raw.Output )
         opDataExport.RawDatasetInfo.connect( opData.DatasetGroup[0] )
 
+    def prepare_lane_for_export(self, lane_index):
+        pass
+#         multi_gui = self.trackingApplet.getMultiLaneGui()
+#         multi_gui.setImageIndex(lane_index)
+#         this_lane_gui = multi_gui.currentGui()
+#         
+#         tracking_request = this_lane_gui._onTrackButtonPressed()
+#         print "Waiting for tracking...."
+#         tracking_request.wait()
+
     def post_process_lane_export(self, lane_index):
         # FIXME: This probably only works for the non-blockwise export slot.
         #        We should assert that the user isn't using the blockwise slot.
@@ -277,22 +295,25 @@ class ConservationTrackingWorkflowBase( Workflow ):
         tracking_ready = objectCountClassifier_ready and \
                            len(opTracking.EventsVector) > 0
                            
-
         busy = False
         busy |= self.dataSelectionApplet.busy
         busy |= self.trackingApplet.busy
         busy |= self.dataExportApplet.busy
         self._shell.enableProjectChanges( not busy )
 
+        # The user isn't allowed to touch anything while batch processing is running.
+        batch_processing_busy = self.batchProcessingApplet.busy
+
         self._shell.setAppletEnabled(self.dataSelectionApplet, not busy)
         if not self.fromBinary:
-            self._shell.setAppletEnabled(self.thresholdTwoLevelsApplet, input_ready and not busy)
-        self._shell.setAppletEnabled(self.objectExtractionApplet, thresholding_ready and not busy)
-        self._shell.setAppletEnabled(self.cellClassificationApplet, features_ready and not busy)
-        self._shell.setAppletEnabled(self.divisionDetectionApplet, features_ready and not busy)
-        self._shell.setAppletEnabled(self.trackingApplet, objectCountClassifier_ready and not busy)
-        self._shell.setAppletEnabled(self.dataExportApplet, tracking_ready and not busy and \
-                                    self.dataExportApplet.topLevelOperator.Inputs[0][0].ready() )
+            self._shell.setAppletEnabled(self.thresholdTwoLevelsApplet, input_ready and not batch_processing_busy and not busy)
+        self._shell.setAppletEnabled(self.objectExtractionApplet, thresholding_ready and not batch_processing_busy and not busy)
+        self._shell.setAppletEnabled(self.cellClassificationApplet, features_ready and not batch_processing_busy and not busy)
+        self._shell.setAppletEnabled(self.divisionDetectionApplet, features_ready and not batch_processing_busy and not busy)
+        self._shell.setAppletEnabled(self.trackingApplet, objectCountClassifier_ready and not batch_processing_busy and not busy)
+        #self._shell.setAppletEnabled(self.dataExportApplet, tracking_ready and not batch_processing_busy and not busy and \
+        #                            self.dataExportApplet.topLevelOperator.Inputs[0][0].ready() )
+        #self._shell.setAppletEnabled(self.batchProcessingApplet, tracking_ready and self.dataExportApplet.topLevelOperator.Inputs[0][0].ready() and not batch_processing_busy and not busy)
         
 
 

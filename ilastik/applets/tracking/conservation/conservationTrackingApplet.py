@@ -15,7 +15,7 @@ class ConservationTrackingApplet( StandardApplet ):
 
     @property
     def broadcastingSlots( self ):
-        return []
+        return ['Parameters', 'ComputedFeatureNames', 'EventsVector', 'ComputedFeatureNamesWithDivFeatures']
 
     @property
     def singleLaneGuiClass( self ):

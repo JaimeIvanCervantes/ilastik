@@ -264,7 +264,7 @@ class ConservationTrackingGui(TrackingBaseGui, ExportingGui):
         req.notify_failed( _handle_failure )
         req.notify_finished( _handle_finished )
         req.submit()
-
+        
     def menus(self):
         m = QtGui.QMenu("&Export", self.volumeEditorWidget)
         m.addAction("Export Tracking Information").triggered.connect(self.show_export_dialog)

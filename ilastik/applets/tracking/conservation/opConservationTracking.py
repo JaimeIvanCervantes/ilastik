@@ -423,8 +423,7 @@ class OpConservationTracking(OpTrackingBase):
         :param filename_suffix: If provided, appended to the filename (before the extension).
         :return:
         """
-
-        assert lane_index == 0, "This has only been tested in tracking workflows with a single image."
+        #assert lane_index == 0, "This has only been tested in tracking workflows with a single image."
 
         with_divisions = self.Parameters.value["withDivisions"] if self.Parameters.ready() else False
         with_merger_resolution = self.Parameters.value["withMergerResolution"] if self.Parameters.ready() else False
