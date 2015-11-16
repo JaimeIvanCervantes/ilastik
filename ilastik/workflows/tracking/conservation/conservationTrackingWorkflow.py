@@ -224,13 +224,11 @@ class ConservationTrackingWorkflowBase( Workflow ):
         for key, value in parameters.items():
             print key, value
         
-        self.trackingApplet.topLevelOperator[0].track(
-            time_range = [0,19],#self.time_range,
-            x_range = [0,1019],#(from_x, to_x + 1),
-            y_range = [0,1019],#(from_y, to_y + 1),
-            z_range = [0,1],#(from_z, to_z + 1),
-            #withOpticalCorrection=False,
-            #withDivisions=False
+        self.trackingApplet.topLevelOperator.track(
+            time_range = parameters['time_range'], #[0,19],
+            x_range = parameters['x_range'],#[0,1019],
+            y_range = parameters['y_range'],#[0,1019],
+            z_range = parameters['z_range'],#[0,1],
             #size_range = (from_size, to_size + 1),
             #x_scale = self._drawer.x_scale.value(),
             #y_scale = self._drawer.y_scale.value(),
