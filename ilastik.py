@@ -73,8 +73,8 @@ def main():
             parsed_args.project = workflow_cmdline_args[0]
             workflow_cmdline_args = []
 
-    
-    parsed_args.project='/home/jcervantes/data/20frames/FlyBowl_20frames_tracking.ilp'
+
+    #parsed_args.project='/home/jcervantes/data/20frames/FlyBowl_20frames_tracking.ilp'
     # DEVELOPERS:
     # Provide your command-line args here. See examples below.
     

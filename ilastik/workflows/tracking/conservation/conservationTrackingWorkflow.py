@@ -224,7 +224,7 @@ class ConservationTrackingWorkflowBase( Workflow ):
         for key, value in parameters.items():
             print key, value
         
-        self.trackingApplet.topLevelOperator.track(
+        self.trackingApplet.topLevelOperator[lane_index].track(
             time_range = parameters['time_range'], #[0,19],
             x_range = parameters['x_range'],#[0,1019],
             y_range = parameters['y_range'],#[0,1019],
