@@ -214,37 +214,38 @@ class ConservationTrackingWorkflowBase( Workflow ):
         opDataExport.RawData.connect( op5Raw.Output )
         opDataExport.RawDatasetInfo.connect( opData.DatasetGroup[0] )
 
-    def prepare_lane_for_export(self, lane_index):
-        #self.trackingApplet.topLevelOperator[0].track(time_range=[0,19], x_range=[0,1019], y_range=[0,1019], z_range=[0,1], withOpticalCorrection=False, withDivisions=False)
-        
+    def prepare_lane_for_export(self, lane_index):      
         ndim=3 # <--Check if correct
             
-        parameters = self.trackingApplet.topLevelOperator.Parameters.value
+        parameters = self.trackingApplet.topLevelOperator[0].Parameters.value
         
+        print "Parameters: "
         for key, value in parameters.items():
             print key, value
+            
+        print "Lane index: ", lane_index
         
         self.trackingApplet.topLevelOperator[lane_index].track(
             time_range = parameters['time_range'], #[0,19],
             x_range = parameters['x_range'],#[0,1019],
             y_range = parameters['y_range'],#[0,1019],
             z_range = parameters['z_range'],#[0,1],
-            #size_range = (from_size, to_size + 1),
-            #x_scale = self._drawer.x_scale.value(),
-            #y_scale = self._drawer.y_scale.value(),
-            #z_scale = self._drawer.z_scale.value(),
+            size_range = parameters['size_range'],
+            x_scale = parameters['scales'][0],
+            y_scale = parameters['scales'][1],
+            z_scale = parameters['scales'][2],
             maxDist=parameters['maxDist'],         
             maxObj = parameters['maxObj'],               
             divThreshold=parameters['divThreshold'],
             avgSize=parameters['avgSize'],                
-            withTracklets=True,#parameters['withTracklets'], # <-- problems in C++ function signature since numpy.bool != bool
-            sizeDependent=False,#parameters['sizeDependent'],
+            withTracklets=parameters['withTracklets'], # <-- problems in C++ function signature since numpy.bool != bool
+            sizeDependent=parameters['sizeDependent'],
             divWeight=parameters['divWeight'],
             transWeight=parameters['transWeight'],
             withDivisions=False,#parameters['withDivisions'],
             withOpticalCorrection=parameters['withOpticalCorrection'],
             withClassifierPrior=parameters['withClassifierPrior'],
-            ndim=ndim,
+            ndim=2,
             withMergerResolution=parameters['withMergerResolution'],
             borderAwareWidth = parameters['borderAwareWidth'],
             withArmaCoordinates = parameters['withArmaCoordinates'],
@@ -259,7 +260,7 @@ class ConservationTrackingWorkflowBase( Workflow ):
         #        We should assert that the user isn't using the blockwise slot.
         settings, selected_features = self.trackingApplet.topLevelOperator.getLane(lane_index).get_table_export_settings()
         if settings:
-            self.dataExportApplet.progressSignal.emit(-1)
+            #self.dataExportApplet.progressSignal.emit(-1)
             raw_dataset_info = self.dataSelectionApplet.topLevelOperator.DatasetGroup[lane_index][0].value
             
             project_path = self.shell.projectManager.currentProjectPath
@@ -286,7 +287,7 @@ class ConservationTrackingWorkflowBase( Workflow ):
                         show_gui=False)
 
             req.wait()
-            self.dataExportApplet.progressSignal.emit(100)
+            #self.dataExportApplet.progressSignal.emit(100)
     
     def _inputReady(self, nRoles):
         slot = self.dataSelectionApplet.topLevelOperator.ImageGroup
@@ -344,9 +345,9 @@ class ConservationTrackingWorkflowBase( Workflow ):
         self._shell.setAppletEnabled(self.cellClassificationApplet, features_ready and not batch_processing_busy and not busy)
         self._shell.setAppletEnabled(self.divisionDetectionApplet, features_ready and not batch_processing_busy and not busy)
         self._shell.setAppletEnabled(self.trackingApplet, objectCountClassifier_ready and not batch_processing_busy and not busy)
-        self._shell.setAppletEnabled(self.dataExportApplet, not batch_processing_busy and not busy and \
+        self._shell.setAppletEnabled(self.dataExportApplet, tracking_ready and not busy and \
                                     self.dataExportApplet.topLevelOperator.Inputs[0][0].ready() )
-        self._shell.setAppletEnabled(self.batchProcessingApplet, self.dataExportApplet.topLevelOperator.Inputs[0][0].ready() and not batch_processing_busy and not busy)
+        #self._shell.setAppletEnabled(self.batchProcessingApplet, tracking_ready and not batch_processing_busy and not busy and self.dataExportApplet.topLevelOperator.Inputs[0][0].ready() )
         
 
 
