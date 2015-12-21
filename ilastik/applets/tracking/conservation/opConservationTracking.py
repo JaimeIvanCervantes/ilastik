@@ -141,7 +141,8 @@ class OpConservationTracking(OpTrackingBase):
             withArmaCoordinates = True,
             appearance_cost = 500,
             disappearance_cost = 500,
-            force_build_hypotheses_graph = False
+            force_build_hypotheses_graph = False,
+            withBatchProcessing = False
             ):
         
         if not self.Parameters.ready():
@@ -197,7 +198,6 @@ class OpConservationTracking(OpTrackingBase):
         
         median_obj_size = [0]
 
-        time_range = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
         ts, empty_frame = self._generate_traxelstore(time_range, x_range, y_range, z_range, 
                                                                       size_range, x_scale, y_scale, z_scale, 
                                                                       median_object_size=median_obj_size, 
@@ -243,11 +243,11 @@ class OpConservationTracking(OpTrackingBase):
 
         if do_build_hypotheses_graph:
             print '\033[94m' +"make new graph"+  '\033[0m'
-            self.tracker = pgmlink.ConsTracking(maxObj,
-                                         sizeDependent,   # size_dependent_detection_prob
+            self.tracker = pgmlink.ConsTracking(int(maxObj),
+                                         bool(sizeDependent),   # size_dependent_detection_prob
                                          float(median_obj_size[0]), # median_object_size
                                          float(maxDist),
-                                         withDivisions,
+                                         bool(withDivisions),
                                          float(divThreshold),
                                          "none",  # detection_rf_filename
                                          fov,
@@ -258,16 +258,16 @@ class OpConservationTracking(OpTrackingBase):
         try:
             eventsVector = self.tracker.track(0,       # forbidden_cost
                                             float(ep_gap), # ep_gap
-                                            withTracklets,
-                                            divWeight,
-                                            transWeight,
-                                            disappearance_cost, # disappearance cost
-                                            appearance_cost, # appearance cost
-                                            ndim,
-                                            transition_parameter,
-                                            borderAwareWidth,
+                                            bool(withTracklets),
+                                            float(divWeight),
+                                            float(transWeight),
+                                            float(disappearance_cost), # disappearance cost
+                                            float(appearance_cost), # appearance cost
+                                            int(ndim),
+                                            float(transition_parameter),
+                                            float(borderAwareWidth),
                                             True, #with_constraints
-                                            cplex_timeout)
+                                            float(cplex_timeout))
             # extract the coordinates with the given event vector
             if withMergerResolution:
                 coordinate_map = pgmlink.TimestepIdCoordinateMap()
@@ -280,10 +280,10 @@ class OpConservationTracking(OpTrackingBase):
                 eventsVector = self.tracker.resolve_mergers(eventsVector,
                                                 coordinate_map.get(),
                                                 float(ep_gap),
-                                                transWeight,
-                                                withTracklets,
-                                                ndim,
-                                                transition_parameter,
+                                                float(transWeight),
+                                                bool(withTracklets),
+                                                int(ndim),
+                                                float(transition_parameter),
                                                 True, # with_constraints
                                                 False) # with_multi_frame_moves
         except Exception as e:
@@ -296,14 +296,16 @@ class OpConservationTracking(OpTrackingBase):
         self.Parameters.setValue(parameters, check_changed=False)
         self.EventsVector.setValue(events, check_changed=False)
         self.RelabeledImage.setDirty()
-        merger_layer_idx = self.parent.parent.trackingApplet._gui.currentGui().layerstack.findMatchingIndex(lambda x: x.name == "Merger")
-        tracking_layer_idx = self.parent.parent.trackingApplet._gui.currentGui().layerstack.findMatchingIndex(lambda x: x.name == "Tracking")
-        if 'withMergerResolution' in parameters.keys() and not parameters['withMergerResolution']:
-            self.parent.parent.trackingApplet._gui.currentGui().layerstack[merger_layer_idx].colorTable = \
-                self.parent.parent.trackingApplet._gui.currentGui().merger_colortable
-        else:
-            self.parent.parent.trackingApplet._gui.currentGui().layerstack[merger_layer_idx].colorTable = \
-                self.parent.parent.trackingApplet._gui.currentGui().tracking_colortable
+        
+        if not withBatchProcessing:
+            merger_layer_idx = self.parent.parent.trackingApplet._gui.currentGui().layerstack.findMatchingIndex(lambda x: x.name == "Merger")
+            tracking_layer_idx = self.parent.parent.trackingApplet._gui.currentGui().layerstack.findMatchingIndex(lambda x: x.name == "Tracking")
+            if 'withMergerResolution' in parameters.keys() and not parameters['withMergerResolution']:
+                self.parent.parent.trackingApplet._gui.currentGui().layerstack[merger_layer_idx].colorTable = \
+                    self.parent.parent.trackingApplet._gui.currentGui().merger_colortable
+            else:
+                self.parent.parent.trackingApplet._gui.currentGui().layerstack[merger_layer_idx].colorTable = \
+                    self.parent.parent.trackingApplet._gui.currentGui().tracking_colortable
 
     def propagateDirty(self, inputSlot, subindex, roi):
         super(OpConservationTracking, self).propagateDirty(inputSlot, subindex, roi)

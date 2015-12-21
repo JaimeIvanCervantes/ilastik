@@ -225,11 +225,20 @@ class ConservationTrackingWorkflowBase( Workflow ):
             
         print "Lane index: ", lane_index
         
+        maxt = self.trackingApplet.topLevelOperator[lane_index].LabelImage.meta.shape[0] 
+        maxx = self.trackingApplet.topLevelOperator[lane_index].LabelImage.meta.shape[1] 
+        maxy = self.trackingApplet.topLevelOperator[lane_index].LabelImage.meta.shape[2] 
+        maxz = self.trackingApplet.topLevelOperator[lane_index].LabelImage.meta.shape[3] 
+        time_enum = range(maxt)
+        x_range = (0, maxx)
+        y_range = (0, maxy)
+        z_range = (0, maxz)
+        
         self.trackingApplet.topLevelOperator[lane_index].track(
-            time_range = parameters['time_range'], #[0,19],
-            x_range = parameters['x_range'],#[0,1019],
-            y_range = parameters['y_range'],#[0,1019],
-            z_range = parameters['z_range'],#[0,1],
+            time_range = time_enum, #parameters['time_range'],
+            x_range = x_range, #parameters['x_range'],
+            y_range = y_range, #parameters['y_range'],
+            z_range = z_range, #parameters['z_range'],
             size_range = parameters['size_range'],
             x_scale = parameters['scales'][0],
             y_scale = parameters['scales'][1],
@@ -242,7 +251,7 @@ class ConservationTrackingWorkflowBase( Workflow ):
             sizeDependent=parameters['sizeDependent'],
             divWeight=parameters['divWeight'],
             transWeight=parameters['transWeight'],
-            withDivisions=False,#parameters['withDivisions'],
+            withDivisions=parameters['withDivisions'],
             withOpticalCorrection=parameters['withOpticalCorrection'],
             withClassifierPrior=parameters['withClassifierPrior'],
             ndim=2,
@@ -252,7 +261,8 @@ class ConservationTrackingWorkflowBase( Workflow ):
             cplex_timeout = parameters['cplex_timeout'],
             appearance_cost = parameters['appearanceCost'],
             disappearance_cost = parameters['disappearanceCost'],
-            force_build_hypotheses_graph = False
+            force_build_hypotheses_graph = False,
+            withBatchProcessing = True
         )
 
     def post_process_lane_export(self, lane_index):
