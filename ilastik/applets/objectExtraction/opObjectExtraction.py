@@ -22,6 +22,7 @@
 from copy import copy, deepcopy
 import collections
 from functools import partial
+from itertools import groupby, count
 
 # SciPy
 import numpy as np
@@ -204,16 +205,18 @@ class OpAdaptTimeListRoi(Operator):
         taggedShape['t'] = 1
         timeIndex = taggedShape.keys().index('t')
 
-        result = {}
-        for t in roi:
-            start = [0] * len(taggedShape)
-            stop = taggedShape.values()
-            start[timeIndex] = t
-            stop[timeIndex] = t + 1
+        # Get time ranges with consecutive numbers
+        time_ranges = [list(g) for _, g in groupby(roi, key=lambda n, c=count(): n - next(c))]
 
+        result = {}             
+        for time_range in time_ranges:
+            start = [time_range[0]]
+            stop = [time_range[-1]+1]
+                  
             val = self.Input(start, stop).wait()
-            assert val.shape == (1,)
-            result[t] = val[0]
+      
+            for i, t in enumerate(time_range):
+                result[t] = val[i]
 
         return result
 
