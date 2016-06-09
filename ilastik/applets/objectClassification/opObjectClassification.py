@@ -1275,11 +1275,14 @@ class OpRelabelSegmentation(Operator):
         img = self.Image(roi.start, roi.stop).wait()
         tIMG = 1000.0*(time.time()-tIMG)
         
-        for t in range(roi.start[0], roi.stop[0]):
-            
+        times = range(roi.start[0], roi.stop[0])
+        
+        map_ = self.ObjectMap(times).wait()
+        
+        for t in range(roi.start[0], roi.stop[0]):  
             tMAP = time.time()
-            map_ = self.ObjectMap([t]).wait()
             tmap = map_[t]
+            
             # FIXME: necessary because predictions are returned
             # enclosed in a list.
             if isinstance(tmap, list):
