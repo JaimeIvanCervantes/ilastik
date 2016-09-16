@@ -99,7 +99,7 @@ class ClassifierSelectionDlg(QDialog):
         
     def _get_available_classifier_factories(self):
         # FIXME: Replace this logic with a proper plugin mechanism
-        from lazyflow.classifiers import VigraRfLazyflowClassifierFactory, SklearnLazyflowClassifierFactory, \
+        from lazyflow.classifiers import VigraRfLazyflowClassifierFactory, SklearnLazyflowClassifierFactory, XgboostLazyflowClassifierFactory, \
                                          ParallelVigraRfLazyflowClassifierFactory, VigraRfPixelwiseClassifierFactory,\
                                          LazyflowVectorwiseClassifierFactoryABC, LazyflowPixelwiseClassifierFactoryABC
         classifiers = collections.OrderedDict()
@@ -130,6 +130,9 @@ class ClassifierSelectionDlg(QDialog):
         classifiers["Parallel Random Forest with Variable Importance (VIGRA)"] = ParallelVigraRfLazyflowClassifierFactory(100, variable_importance_enabled=True)        
         classifiers["(debug) Single-threaded Random Forest (VIGRA)"] = VigraRfLazyflowClassifierFactory(100)
         classifiers["(debug) Pixelwise Random Forest (VIGRA)"] = VigraRfPixelwiseClassifierFactory(100)
+
+        # xgboost classifier
+        classifiers["XGBoost Classifier"] = XgboostLazyflowClassifierFactory()
         
         return classifiers
         
