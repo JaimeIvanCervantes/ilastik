@@ -7,7 +7,7 @@ from lazyflow.stype import Opaque
 from lazyflow.rtype import SubRegion, List
 from lazyflow.operators import OpArrayCache
 from lazyflow.roi import roiToSlice
-from ilastik.applets.objectExtraction.opObjectExtraction import OpObjectExtraction    ,\
+from ilastik.applets.objectExtraction.opObjectExtractionOptimized import OpObjectExtraction    ,\
     default_features_key, OpAdaptTimeListRoi
 from ilastik.applets.trackingFeatureExtraction import config
 from ilastik.applets.trackingFeatureExtraction.trackingFeatures import FeatureManager
@@ -154,11 +154,11 @@ class OpTrackingFeatureExtraction(Operator):
                                                 # For other workflows, output has rtype=ArrayLike, indexed by (t)
     BlockwiseRegionFeaturesDivision = OutputSlot() 
     
-    CleanLabelBlocks = OutputSlot()
-    LabelImageCacheInput = InputSlot(optional=True)
+#    CleanLabelBlocks = OutputSlot()
+#     LabelImageCacheInput = InputSlot(optional=True)
 
-    RegionFeaturesCacheInputVigra = InputSlot(optional=True)
-    RegionFeaturesCleanBlocksVigra = OutputSlot()
+#     RegionFeaturesCacheInputVigra = InputSlot(optional=True)
+#     RegionFeaturesCleanBlocksVigra = OutputSlot()
     
     RegionFeaturesCacheInputDivision = InputSlot(optional=True)
     RegionFeaturesCleanBlocksDivision = OutputSlot()
@@ -178,10 +178,10 @@ class OpTrackingFeatureExtraction(Operator):
         self._objectExtraction.BinaryImage.connect(self.BinaryImage)
 
         self._objectExtraction.Features.connect(self.FeatureNamesVigra)
-        self._objectExtraction.RegionFeaturesCacheInput.connect(self.RegionFeaturesCacheInputVigra)
-        self._objectExtraction.LabelImageCacheInput.connect(self.LabelImageCacheInput)
-        self.CleanLabelBlocks.connect(self._objectExtraction.CleanLabelBlocks)
-        self.RegionFeaturesCleanBlocksVigra.connect(self._objectExtraction.RegionFeaturesCleanBlocks)
+#         self._objectExtraction.RegionFeaturesCacheInput.connect(self.RegionFeaturesCacheInputVigra)
+#         self._objectExtraction.LabelImageCacheInput.connect(self.LabelImageCacheInput)
+#        self.CleanLabelBlocks.connect(self._objectExtraction.CleanLabelBlocks)
+#         self.RegionFeaturesCleanBlocksVigra.connect(self._objectExtraction.RegionFeaturesCleanBlocks)
         self.ObjectCenterImage.connect(self._objectExtraction.ObjectCenterImage)
         self.LabelImage.connect(self._objectExtraction.LabelImage)
         self.BlockwiseRegionFeaturesVigra.connect(self._objectExtraction.BlockwiseRegionFeatures)     
@@ -247,9 +247,10 @@ class OpTrackingFeatureExtraction(Operator):
             self.ComputedFeatureNamesNoDivisions.setDirty(roi)
 
     def setInSlot(self, slot, subindex, roi, value):
-        assert slot == self.RegionFeaturesCacheInputVigra or \
-            slot == self.RegionFeaturesCacheInputDivision or \
-            slot == self.LabelImageCacheInput, "Invalid slot for setInSlot(): {}".format(slot.name)
+        pass
+#         assert slot == self.RegionFeaturesCacheInputVigra or \
+#             slot == self.RegionFeaturesCacheInputDivision or \
+#             slot == self.LabelImageCacheInput, "Invalid slot for setInSlot(): {}".format(slot.name)
            
     def _checkConstraints(self, *args):
         if self.RawImage.ready():
