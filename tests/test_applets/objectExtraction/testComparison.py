@@ -21,14 +21,22 @@
 import unittest
 import numpy as np
 import vigra
+
 from lazyflow.graph import Graph
 from lazyflow.operators import OpLabelVolume
-from ilastik.applets.objectExtraction.opObjectExtraction import OpAdaptTimeListRoi, OpRegionFeatures, OpObjectExtraction
-from ilastik.plugins import pluginManager
-from ilastik.applets.dataSelection.opDataSelection import OpDataSelection, DatasetInfo
+from lazyflow.utility import Timer
 from lazyflow.operators.opReorderAxes import OpReorderAxes
 from lazyflow.request import Request, RequestPool
 from functools import partial
+
+from ilastik.applets.objectExtraction.opObjectExtraction import OpAdaptTimeListRoi, OpRegionFeatures, OpObjectExtraction
+
+from ilastik.applets.objectExtraction.opObjectExtractionOptimized import OpAdaptTimeListRoi as OpAdaptTimeListRoiOpt
+from ilastik.applets.objectExtraction.opObjectExtraction import OpRegionFeatures as OpRegionFeaturesOpt
+from ilastik.applets.objectExtraction.opObjectExtraction import OpObjectExtraction as OpObjectExtractionOpt
+
+from ilastik.plugins import pluginManager
+from ilastik.applets.dataSelection.opDataSelection import OpDataSelection, DatasetInfo
 
 from lazyflow.operators.ioOperators import OpStreamingHdf5Reader
 import h5py
@@ -50,6 +58,9 @@ FEATURES = {
         "Coord<Maximum>" : {},
     }
 }
+
+FILE_RAW = 'movie10.h5'
+FILE_BINARY = 'movie10_Simple Segmentation.h5'
 
 def binaryImage():
     img = np.zeros((2, 50, 50, 50, 1), dtype=np.float32)
@@ -93,7 +104,7 @@ class TestOpComparison(object):
         
         g = Graph()     
         
-        self.h5FileRaw = h5py.File('/groups/branson/home/cervantesj/profiling/Alice/Fly_Bowl/data/GMR_71G01_AE_01_TrpA_Rig2Plate14BowlC_20110707T154934/movie10.h5', 'r')        
+        self.h5FileRaw = h5py.File(FILE_RAW, 'r')        
 
         self.opReaderRaw = OpStreamingHdf5Reader(graph=g)
         self.opReaderRaw.Hdf5File.setValue(self.h5FileRaw)
@@ -103,7 +114,7 @@ class TestOpComparison(object):
         self.op5Raw.AxisOrder.setValue("txyzc")
         self.op5Raw.Input.connect(self.opReaderRaw.OutputImage)
 
-        self.h5FileBinary = h5py.File('/groups/branson/home/cervantesj/profiling/Alice/Fly_Bowl/data/GMR_71G01_AE_01_TrpA_Rig2Plate14BowlC_20110707T154934/movie10_Simple Segmentation.h5', 'r')
+        self.h5FileBinary = h5py.File(FILE_BINARY, 'r')
 
         self.opReaderBinary = OpStreamingHdf5Reader(graph=g)
         self.opReaderBinary.Hdf5File.setValue(self.h5FileBinary)
@@ -114,74 +125,84 @@ class TestOpComparison(object):
         self.op5Binary.Input.connect(self.opReaderBinary.OutputImage)
         
         self.opLabel = OpLabelVolume(graph=g)
-        self.opLabel.Input.connect(self.opReaderBinary.OutputImage)
-        #self.opLabel.Input.connect(self.op5Binary.Output)#self.opReaderBinary.OutputImage)
+        #self.opLabel.Input.connect(self.opReaderBinary.OutputImage)
+        self.opLabel.Input.connect(self.op5Binary.Output)
         
+        # Object extraction operators
         self.op = OpRegionFeatures(graph=g)
         self.op.LabelVolume.connect(self.opLabel.Output)
-        self.op.RawVolume.connect(self.opReaderRaw.OutputImage)
-        #self.op.RawVolume.connect(self.op5Raw.Output)#self.opReaderRaw.OutputImage)
+        #self.op.RawVolume.connect(self.opReaderRaw.OutputImage)
+        self.op.RawVolume.connect(self.op5Raw.Output)
         self.op.Features.setValue(FEATURES)
 
         self.opAdapt = OpAdaptTimeListRoi(graph=self.op.graph)
         self.opAdapt.Input.connect(self.op.Output)
+        
+        # Optimized object extraction operator
+        self.opOpt = OpRegionFeaturesOpt(graph=g)
+        self.opOpt.LabelVolume.connect(self.opLabel.Output)
+        self.opOpt.RawVolume.connect(self.op5Raw.Output)
+        self.opOpt.Features.setValue(FEATURES)
+
+        self.opAdaptOpt = OpAdaptTimeListRoiOpt(graph=self.opOpt.graph)
+        self.opAdaptOpt.Input.connect(self.opOpt.Output)
 
     def test_features(self):
         self.op.Output.fixed = False
 
-        #labels = self.opLabel.Output([]).wait()
-        #feats = self.opAdapt.Output([]).wait()
+        with Timer() as timerOp:
+            featsOp = self.opAdapt.Output([]).wait()
+
+        print "Op feature computation took: {} seconds".format(timerOp.seconds())
         
-        #t_ind = self.op5Raw.Output.meta.axistags.index('t')
+        with Timer() as timerOpOpt:
+            featsOpOpt = self.opAdaptOpt.Output([]).wait()
+
+        print "Op feature computation took: {} seconds".format(timerOpOpt.seconds())
     
-        result = dict.fromkeys( range(self.op5Raw.Output.meta.shape[0]), None)
-    
-        pool = RequestPool()    
-        for t in range(self.op5Raw.Output.meta.shape[0]):
-            pool.add( Request( partial(self._computeFeatures, t, result) ) )
-        pool.wait()        
+        with Timer() as timerBasic:
+            featsBasic = dict.fromkeys( range(self.op5Raw.Output.meta.shape[0]), None)
         
-        print "Hello World"  
-               
-        #assert len(feats)== self.img.shape[0]
+            pool = RequestPool()    
+            for t in range(self.op5Raw.Output.meta.shape[0]):
+                pool.add( Request( partial(self._computeFeatures, t, featsBasic) ) )
+            pool.wait()
+            
+        print "Basic feature computation took: {} seconds".format(timerBasic.seconds())        
         
-#         for t in feats:
-#             assert feats[t][NAME]['Count'].shape[0] > 0
-#             assert feats[t][NAME]['RegionCenter'].shape[0] > 0
-# 
-#         assert np.any(feats[0][NAME]['Count'] != feats[1][NAME]['Count'])
-#         assert np.any(feats[0][NAME]['RegionCenter'] != feats[1][NAME]['RegionCenter'])
 
     def _computeFeatures(self, t, result):
         # Process entire spatial volume
-#         roi = [slice(None) for i in range(len(self.op5Raw.Output.meta.shape))]
-#         roi[0] = slice(t, t+1)
-#         roi = tuple(roi)
+        roi = [slice(None) for i in range(len(self.op5Raw.Output.meta.shape))]
+        roi[0] = slice(t, t+1)
+        roi = tuple(roi)
 
-        roiRaw = [slice(None) for i in range(len(self.opReaderRaw.OutputImage.meta.shape))]
-        roiRaw[0] = slice(t, t+1)
-        roiRaw = tuple(roiRaw)
-        
-        roiBinary = [slice(None) for i in range(len(self.opReaderBinary.OutputImage.meta.shape))]
-        roiBinary[0] = slice(t, t+1)
-        roiBinary = tuple(roiBinary)
+#         roiRaw = [slice(None) for i in range(len(self.opReaderRaw.OutputImage.meta.shape))]
+#         roiRaw[0] = slice(t, t+1)
+#         roiRaw = tuple(roiRaw)
+#         
+#         roiBinary = [slice(None) for i in range(len(self.opReaderBinary.OutputImage.meta.shape))]
+#         roiBinary[0] = slice(t, t+1)
+#         roiBinary = tuple(roiBinary)
 
         # Request in parallel
-        image = self.op5Raw.Output(roiRaw).wait()
-        labels = self.opLabel.Output(roiBinary).wait()
+        image = self.op5Raw.Output(roi).wait()
+        labels = self.opLabel.Output(roi).wait()
+        #image = self.op5Raw.Output(roiRaw).wait()
+        #labels = self.opLabel.Output(roiBinary).wait()
         
         features = ['Count', 'Coord<Minimum>', 'RegionCenter', 'Coord<Principal<Kurtosis>>', 'Coord<Maximum>']
         
         result[t] = vigra.analysis.extractRegionFeatures(image.squeeze().astype(np.float32), labels.squeeze().astype(np.uint32), features, ignoreLabel=0)
         
         
-    def test_table_export(self):
-        self.opAdapt = OpAdaptTimeListRoi(graph=self.op.graph)
-        self.opAdapt.Input.connect(self.op.Output)
-
-        feats = self.opAdapt.Output([0, 1]).wait()
-        print "feature length:", len(feats)
-        OpObjectExtraction.createExportTable(feats)
+#     def test_table_export(self):
+#         self.opAdapt = OpAdaptTimeListRoi(graph=self.op.graph)
+#         self.opAdapt.Input.connect(self.op.Output)
+# 
+#         feats = self.opAdapt.Output([0, 1]).wait()
+#         print "feature length:", len(feats)
+#         OpObjectExtraction.createExportTable(feats)
 
 
 
