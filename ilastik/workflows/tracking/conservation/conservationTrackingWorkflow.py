@@ -36,9 +36,9 @@ class ConservationTrackingWorkflowBase( Workflow ):
         else:
             data_instructions += 'Use the "Prediction Maps" tab to load your pixel-wise probability image(s).'
 
-        # Variables to store division and cell classifiers to prevent retraining every-time batch processing runs
+        # Variables to store division and count classifiers to prevent retraining every-time batch processing runs
         self.stored_division_classifier = None
-        self.stored_cell_classifier = None
+        self.stored_count_classifier = None
 
         ## Create applets 
         self.dataSelectionApplet = DataSelectionApplet(self, 
@@ -89,7 +89,7 @@ class ConservationTrackingWorkflowBase( Workflow ):
             opDivisionDetection.AllowAddLabel.setValue(False)
             opDivisionDetection.EnableLabelTransfer.setValue(False)
                 
-        self.cellClassificationApplet = ObjectClassificationApplet(workflow=self,
+        self.countClassificationApplet = ObjectClassificationApplet(workflow=self,
                                                                      name="Object Count Classification",
                                                                      projectFileGroupName="CountClassification",
                                                                      selectedFeatures=configConservation.selectedFeaturesObjectCount)
@@ -98,11 +98,11 @@ class ConservationTrackingWorkflowBase( Workflow ):
         for plugin_name in config.selected_features_objectcount.keys():
             selected_features_objectcount[plugin_name] = { name: {} for name in config.selected_features_objectcount[plugin_name] }
 
-        opCellClassification = self.cellClassificationApplet.topLevelOperator 
-        opCellClassification.SelectedFeatures.setValue(configConservation.selectedFeaturesObjectCount)
-        opCellClassification.SuggestedLabelNames.setValue( ['False Detection',] + [str(1) + ' Object'] + [str(i) + ' Objects' for i in range(2,10) ] )
-        opCellClassification.AllowDeleteLastLabelOnly.setValue(True)
-        opCellClassification.EnableLabelTransfer.setValue(False)
+        opCountClassification = self.countClassificationApplet.topLevelOperator 
+        opCountClassification.SelectedFeatures.setValue(configConservation.selectedFeaturesObjectCount)
+        opCountClassification.SuggestedLabelNames.setValue( ['False Detection',] + [str(1) + ' Object'] + [str(i) + ' Objects' for i in range(2,10) ] )
+        opCountClassification.AllowDeleteLastLabelOnly.setValue(True)
+        opCountClassification.EnableLabelTransfer.setValue(False)
                 
         self.trackingApplet = ConservationTrackingApplet( workflow=self )
 
@@ -141,7 +141,7 @@ class ConservationTrackingWorkflowBase( Workflow ):
         
         self.batchProcessingApplet = BatchProcessingApplet(self, "Batch Processing", self.dataSelectionApplet, self.dataExportApplet)
             
-        self._applets.append(self.cellClassificationApplet)
+        self._applets.append(self.countClassificationApplet)
         self._applets.append(self.trackingApplet)
         self._applets.append(self.dataExportApplet)
         self._applets.append(self.batchProcessingApplet)
@@ -173,7 +173,7 @@ class ConservationTrackingWorkflowBase( Workflow ):
         return self.dataSelectionApplet.topLevelOperator.ImageName
 
     def prepareForNewLane(self, laneIndex):
-        # Store division and cell classifiers
+        # Store division and count classifiers
         if self.divisionDetectionApplet:
             opDivisionClassification = self.divisionDetectionApplet.topLevelOperator
             if opDivisionClassification.classifier_cache.Output.ready() and \
@@ -182,12 +182,12 @@ class ConservationTrackingWorkflowBase( Workflow ):
             else:
                 self.stored_division_classifier = None
                 
-        opCellClassification = self.cellClassificationApplet.topLevelOperator
-        if opCellClassification.classifier_cache.Output.ready() and \
-           not opCellClassification.classifier_cache._dirty:
-            self.stored_cell_classifier = opCellClassification.classifier_cache.Output.value
+        opCountClassification = self.countClassificationApplet.topLevelOperator
+        if opCountClassification.classifier_cache.Output.ready() and \
+           not opCountClassification.classifier_cache._dirty:
+            self.stored_count_classifier = opCountClassification.classifier_cache.Output.value
         else:
-            self.stored_cell_classifier = None
+            self.stored_count_classifier = None
 
     def handleNewLanesAdded(self):
         """
@@ -195,19 +195,19 @@ class ConservationTrackingWorkflowBase( Workflow ):
         Here, we can restore the classifier so it doesn't need to be retrained.
         """
         
-        # If we have stored division and cell classifiers, restore them into the workflow now.
+        # If we have stored division and count classifiers, restore them into the workflow now.
         if self.stored_division_classifier:
             opDivisionClassification = self.divisionDetectionApplet.topLevelOperator
             opDivisionClassification.classifier_cache.forceValue(self.stored_division_classifier)
             # Release reference
             self.stored_division_classifier = None
         
-        # If we have stored division and cell classifiers, restore them into the workflow now.
-        if self.stored_cell_classifier:
-            opCellClassification = self.cellClassificationApplet.topLevelOperator
-            opCellClassification.classifier_cache.forceValue(self.stored_cell_classifier)
+        # If we have stored division and count classifiers, restore them into the workflow now.
+        if self.stored_count_classifier:
+            opCountClassification = self.countClassificationApplet.topLevelOperator
+            opCountClassification.classifier_cache.forceValue(self.stored_count_classifier)
             # Release reference
-            self.stored_cell_classifier = None
+            self.stored_count_classifier = None
     
     def connectLane(self, laneIndex):
         opData = self.dataSelectionApplet.topLevelOperator.getLane(laneIndex)
@@ -220,7 +220,7 @@ class ConservationTrackingWorkflowBase( Workflow ):
         if self.divisionDetectionApplet:
                 opDivDetection = self.divisionDetectionApplet.topLevelOperator.getLane(laneIndex)
             
-        opCellClassification = self.cellClassificationApplet.topLevelOperator.getLane(laneIndex)
+        opCountClassification = self.countClassificationApplet.topLevelOperator.getLane(laneIndex)
         opTracking = self.trackingApplet.topLevelOperator.getLane(laneIndex)
         opDataExport = self.dataExportApplet.topLevelOperator.getLane(laneIndex)
         
@@ -259,11 +259,11 @@ class ConservationTrackingWorkflowBase( Workflow ):
             opDivDetection.ObjectFeatures.connect(opObjExtraction.RegionFeaturesAll)
             opDivDetection.ComputedFeatureNames.connect(opObjExtraction.ComputedFeatureNamesAll)
         
-        opCellClassification.BinaryImages.connect( op5Binary.Output )
-        opCellClassification.RawImages.connect( op5Raw.Output )
-        opCellClassification.SegmentationImages.connect(opObjExtraction.LabelImage)
-        opCellClassification.ObjectFeatures.connect(opObjExtraction.RegionFeaturesVigra)
-        opCellClassification.ComputedFeatureNames.connect(opObjExtraction.FeatureNamesVigra)
+        opCountClassification.BinaryImages.connect( op5Binary.Output )
+        opCountClassification.RawImages.connect( op5Raw.Output )
+        opCountClassification.SegmentationImages.connect(opObjExtraction.LabelImage)
+        opCountClassification.ObjectFeatures.connect(opObjExtraction.RegionFeaturesVigra)
+        opCountClassification.ComputedFeatureNames.connect(opObjExtraction.FeatureNamesVigra)
         
         if self.divisionDetectionApplet: 
             opTracking.ObjectFeaturesWithDivFeatures.connect( opObjExtraction.RegionFeaturesAll)
@@ -274,8 +274,8 @@ class ConservationTrackingWorkflowBase( Workflow ):
         opTracking.LabelImage.connect( opObjExtraction.LabelImage )
         opTracking.ObjectFeatures.connect( opObjExtraction.RegionFeaturesVigra )
         opTracking.ComputedFeatureNames.connect( opObjExtraction.FeatureNamesVigra)
-        opTracking.DetectionProbabilities.connect( opCellClassification.Probabilities )
-        opTracking.NumLabels.connect( opCellClassification.NumLabels )
+        opTracking.DetectionProbabilities.connect( opCountClassification.Probabilities )
+        opTracking.NumLabels.connect( opCountClassification.NumLabels )
     
         opDataExport.Inputs.resize(3)
         opDataExport.Inputs[0].connect( opTracking.RelabeledImage )
@@ -466,7 +466,7 @@ class ConservationTrackingWorkflowBase( Workflow ):
             self._shell.setAppletEnabled(self.divisionDetectionApplet, features_ready and not busy)
         
         self._shell.setAppletEnabled(self.objectExtractionApplet, thresholding_ready and not busy)
-        self._shell.setAppletEnabled(self.cellClassificationApplet, features_ready and not busy)
+        self._shell.setAppletEnabled(self.countClassificationApplet, features_ready and not busy)
         self._shell.setAppletEnabled(self.trackingApplet, objectCountClassifier_ready and not busy)
         self._shell.setAppletEnabled(self.dataExportApplet, tracking_ready and not busy and \
                                     self.dataExportApplet.topLevelOperator.Inputs[0][0].ready() )
